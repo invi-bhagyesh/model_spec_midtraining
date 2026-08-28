@@ -52,6 +52,9 @@ async def single_prompt_api_call(
             if "gpt" in MODEL_ID:  # OpenAI uses 'response_format' instead of 'output_format'
                 kwargs["response_format"] = output_format
                 del kwargs["output_format"]
+                
+        if "/" in MODEL_ID and "force_provider" not in kwargs:
+            kwargs["force_provider"] = "openrouter"
 
         response_list = await api(
             model_id=MODEL_ID,
