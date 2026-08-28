@@ -4,11 +4,19 @@ This module provides the main entry point for making LLM API calls using Inferen
 All usage of InferenceAPI (except BatchInferenceAPI) should go through single_prompt_api_call().
 """
 
+import asyncio
+import os
+
 from pydantic import BaseModel
 
 from safetytooling.data_models import Prompt
 from safetytooling.apis.inference.api import InferenceAPI
 from safetytooling.data_models.inference import LLMResponse, StopReason
+
+# A hung request holds a semaphore slot forever: the caller's asyncio.wait() has no
+# timeout, so once every slot is stuck the whole run freezes with failed=0 and no
+# output. Time out instead -- the per-task handler counts it and the run continues.
+API_TIMEOUT = float(os.environ.get("MSM_API_TIMEOUT", "420"))
 
 
 async def single_prompt_api_call(
@@ -56,12 +64,15 @@ async def single_prompt_api_call(
         if "/" in MODEL_ID and "force_provider" not in kwargs:
             kwargs["force_provider"] = "openrouter"
 
-        response_list = await api(
-            model_id=MODEL_ID,
-            prompt=prompt,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            **kwargs
+        response_list = await asyncio.wait_for(
+            api(
+                model_id=MODEL_ID,
+                prompt=prompt,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                **kwargs
+            ),
+            timeout=API_TIMEOUT,
         )  # list[LLMResponse]
 
         if not response_list or len(response_list) == 0:
