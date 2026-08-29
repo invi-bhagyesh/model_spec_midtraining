@@ -17,6 +17,8 @@ from safetytooling.data_models.inference import LLMResponse, StopReason
 # timeout, so once every slot is stuck the whole run freezes with failed=0 and no
 # output. Time out instead -- the per-task handler counts it and the run continues.
 API_TIMEOUT = float(os.environ.get("MSM_API_TIMEOUT", "420"))
+OPENROUTER_PROVIDERS = [p for p in
+                        os.environ.get("MSM_OPENROUTER_PROVIDERS", "").split(",") if p]
 
 
 async def single_prompt_api_call(
@@ -63,6 +65,14 @@ async def single_prompt_api_call(
                 
         if "/" in MODEL_ID and "force_provider" not in kwargs:
             kwargs["force_provider"] = "openrouter"
+
+        # OpenRouter picks an upstream per request and they differ in behaviour (some serve
+        # reasoning models in reasoning mode, returning content=null). Set
+        # MSM_OPENROUTER_PROVIDERS="DeepInfra,Fireworks" to pin routing and remove that variance.
+        if OPENROUTER_PROVIDERS and "/" in MODEL_ID:
+            kwargs.setdefault("extra_body", {})["provider"] = {
+                "order": OPENROUTER_PROVIDERS, "allow_fallbacks": False,
+            }
 
         response_list = await asyncio.wait_for(
             api(

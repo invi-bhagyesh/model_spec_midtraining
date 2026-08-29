@@ -75,6 +75,11 @@ class DataGeneratorConfig(ExperimentConfigBase):
     spec_type: str = "default"
     model_id: str = "claude-opus-4-5-20251101"
     max_output_tokens: int = 64000
+    # Per-call ceiling for the generation stages. Reasoning models (e.g. deepseek-v4-pro
+    # via OpenRouter, which routes across ~17 upstreams that differ in whether they run
+    # the model in reasoning mode) spend this budget on reasoning first and return
+    # content=null if it runs out -- surfacing as 'No response data received'.
+    max_doc_tokens: int = 16000
     temperature: float | None = None
     n_domains: int = 5
     n_doc_ideas: int = 5
@@ -408,7 +413,7 @@ class DataGenerator:
                 api=self.config.api,
                 MODEL_ID=self.config.model_id,
                 prompt=prompt,
-                max_tokens=min(5000, self.config.max_output_tokens),
+                max_tokens=min(self.config.max_doc_tokens, self.config.max_output_tokens),
                 temperature=self.config.temperature,
                 )
             for prompt in prompts
@@ -474,7 +479,7 @@ class DataGenerator:
                 api=self.config.api,
                 MODEL_ID=self.config.model_id,
                 prompt=prompt,
-                max_tokens=min(5000, self.config.max_output_tokens),
+                max_tokens=min(self.config.max_doc_tokens, self.config.max_output_tokens),
                 temperature=self.config.temperature,
                 )
             for prompt in prompts
@@ -542,7 +547,7 @@ class DataGenerator:
                     api=self.config.api,
                     MODEL_ID=self.config.model_id,
                     prompt=prompt,
-                    max_tokens=min(5000, self.config.max_output_tokens),
+                    max_tokens=min(self.config.max_doc_tokens, self.config.max_output_tokens),
                     temperature=self.config.temperature,
                     )
 
@@ -637,7 +642,7 @@ class DataGenerator:
                 batch_api(
                     model_id=self.config.model_id,
                     prompts=prompts,
-                    max_tokens=min(5000, self.config.max_output_tokens),
+                    max_tokens=min(self.config.max_doc_tokens, self.config.max_output_tokens),
                     temperature=self.config.temperature,
                 ),
                 timeout=timeout_seconds,
@@ -690,7 +695,7 @@ class DataGenerator:
                     api=self.config.api,
                     MODEL_ID=self.config.model_id,
                     prompt=prompt,
-                    max_tokens=min(5000, self.config.max_output_tokens),
+                    max_tokens=min(self.config.max_doc_tokens, self.config.max_output_tokens),
                     temperature=self.config.temperature,
                 )
 
@@ -847,6 +852,7 @@ class DataGenerator:
                 "spec_type": self.config.spec_type,
                 "model_id": self.config.model_id,
                 "max_output_tokens": self.config.max_output_tokens,
+                "max_doc_tokens": self.config.max_doc_tokens,
                 "temperature": self.config.temperature,
                 "n_domains": self.config.n_domains,
                 "n_doc_types": self.config.n_doc_types,
